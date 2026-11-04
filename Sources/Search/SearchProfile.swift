@@ -206,7 +206,12 @@ enum SearchProfile {
         counts["profiles"] = profileCount
 
         // The whole list: its order spans profiles, so import remaps it.
-        _ = copy("spaces.json", to: staging)
+        // Spaces.write makes no file while Personal has its one space, yet
+        // import restores only the sessions of spaces it is given: the list
+        // Spaces.read makes on the spot goes in instead.
+        if !copy("spaces.json", to: staging), let data = try? JSONEncoder().encode(allSpaces) {
+            try? data.write(to: staging.appendingPathComponent("spaces.json"), options: .atomic)
+        }
         counts["spaces"] = mine.count
 
         // Each of this profile's spaces keeps its session beside the store's.

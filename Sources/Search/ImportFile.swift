@@ -479,6 +479,9 @@ enum ImportFile {
         out.manifest = decode("manifest.json")
         if let profiles: [Profile] = decode("profiles.json") { out.profiles = profiles }
         if let spaces: [Space] = decode("spaces.json") { out.spaces = spaces }
+        // No list is Personal's one space, as Spaces.read has it: a file
+        // exported without one still brings that space's tabs.
+        if out.spaces.isEmpty { out.spaces = [Space.first()] }
         if let raw = data("pins.json") {
             if let decoded = Pins.decode(raw) {
                 for (id, defs) in decoded.bySpace { out.pinsBySpace[id.uuidString] = defs }
