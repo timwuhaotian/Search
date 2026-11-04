@@ -90,6 +90,7 @@ struct TabBar: View {
                                                 ForEach(Array(members.enumerated()), id: \.element.id) { index, tab in
                                                     topTab(tab, index: index, count: members.count,
                                                            group: group.id, strip: geo.size.width, each: each)
+                                                        .transition(.opacity)
                                                 }
                                             }
                                             let ungrouped = browser.displayedTabs.filter { $0.pin == nil && browser.group(of: $0) == nil }
@@ -403,7 +404,7 @@ struct TabBar: View {
         let extra = pairWidthExtra(in: looseTabs, base: each, splits: browser.splits)
         let headers = browser.prefs.usesTabGroups ? CGFloat(browser.tabGroups.count) : 0
         let headingWidth = browser.prefs.usesTabGroups
-            ? browser.tabGroups.reduce(CGFloat.zero) { $0 + GroupHeading.width(for: $1.name, numbered: browser.prefs.showsTabShortcuts && $1.collapsed) } : 0
+            ? browser.tabGroups.reduce(CGFloat.zero) { $0 + GroupHeading.width(for: $1.name, numbered: browser.prefs.showsTabShortcuts && $1.collapsed, hidden: browser.hiddenTabCount(in: $1), marked: $1.collapsed && browser.groupContainsActive($1)) } : 0
         let shown = Int(pinned + loose + headers)
         var total = pinned * Metrics.pinWidth + loose * each + extra
             + headingWidth + CGFloat(max(0, shown - 1)) * Metrics.tabGap
@@ -444,7 +445,7 @@ struct TabBar: View {
             guard count > 0 else { return Metrics.tabWidth }
             let extra = pairWidthExtra(in: items, base: Metrics.tabMinWidth, splits: browser.splits)
             let spent = CGFloat(pins) * Metrics.pinWidth + extra
-                + browser.tabGroups.reduce(CGFloat.zero) { $0 + GroupHeading.width(for: $1.name, numbered: browser.prefs.showsTabShortcuts && $1.collapsed) }
+                + browser.tabGroups.reduce(CGFloat.zero) { $0 + GroupHeading.width(for: $1.name, numbered: browser.prefs.showsTabShortcuts && $1.collapsed, hidden: browser.hiddenTabCount(in: $1), marked: $1.collapsed && browser.groupContainsActive($1)) }
                 + CGFloat(max(0, pins + count + browser.tabGroups.count - 1)) * Metrics.tabGap
                 + (pinLine ? PinLine.space : 0)
             return max(Metrics.tabMinWidth, min(Metrics.tabWidth, (room(in: strip) - spent) / CGFloat(count)))

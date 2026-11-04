@@ -695,6 +695,7 @@ struct SideBar: View {
                 rowItem(tab, tabs: browser.tabs, splits: browser.splits,
                         activeID: browser.activeID, interactive: true, pill: pill,
                         close: { browser.closeTab(tab) })
+                    .transition(.opacity)
                     .padding(.leading, icons ? 0 : 14)
                     .modifier(Carried(index: index, count: members.count,
                                       step: rowHeight + SideBar.gap, vertical: true,

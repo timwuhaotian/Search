@@ -4718,8 +4718,22 @@ final class Browser: NSObject, ObservableObject {
 
     func toggleTabGroup(_ id: UUID) {
         guard let index = tabGroups.firstIndex(where: { $0.id == id }) else { return }
-        tabGroups[index].collapsed.toggle()
+        withAnimation(Motion.settle) { tabGroups[index].collapsed.toggle() }
         writeSession(now: true)
+    }
+
+    /// Tabs a folded group keeps out of the row: every member that stands in
+    /// one, minus the tab in front still shown under the heading.
+    func hiddenTabCount(in group: TabGroup) -> Int {
+        guard group.collapsed else { return 0 }
+        return tabs(in: group.id).filter(standsInRow).count - visibleTabs(in: group).count
+    }
+
+    /// The tab in front belongs to this group, so a folded heading is where
+    /// the page on screen lives.
+    func groupContainsActive(_ group: TabGroup) -> Bool {
+        guard let active else { return false }
+        return self.group(of: active) == group.id
     }
 
     /// Fold All Groups / Unfold All Groups, in the space's menu and the View
@@ -4728,8 +4742,10 @@ final class Browser: NSObject, ObservableObject {
     /// front if that is one of its own, as one folded by hand does.
     func foldAllGroups(_ fold: Bool) {
         guard tabGroups.contains(where: { $0.collapsed != fold }) else { return }
-        for index in tabGroups.indices where tabGroups[index].collapsed != fold {
-            tabGroups[index].collapsed = fold
+        withAnimation(Motion.settle) {
+            for index in tabGroups.indices where tabGroups[index].collapsed != fold {
+                tabGroups[index].collapsed = fold
+            }
         }
         writeSession(now: true)
     }
