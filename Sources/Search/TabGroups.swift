@@ -67,9 +67,40 @@ struct GroupHeading: View {
     /// And in the column of icons.
     static let compactHeight: CGFloat = 18
 
-    static func width(for name: String, numbered: Bool = false) -> CGFloat {
+    static func width(for name: String, numbered: Bool = false, hidden: Int = 0, marked: Bool = false) -> CGFloat {
         let font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
-        return ceil((name as NSString).size(withAttributes: [.font: font]).width) + 20 + (numbered ? 23 : 0)
+        // Name + padding + the always-shown chevron, then what a folded
+        // heading adds: the count capsule and the active tab's dot.
+        return ceil((name as NSString).size(withAttributes: [.font: font]).width) + 20 + 15
+            + (numbered ? 23 : 0)
+            + (hidden > 0 ? CGFloat(String(hidden).count) * 7 + 18 : 0)
+            + (marked ? 12 : 0)
+    }
+
+    /// Tabs folded away under this heading, and whether the page on screen
+    /// is one of them.
+    private var hidden: Int { browser.hiddenTabCount(in: group) }
+    private var marked: Bool { group.collapsed && browser.groupContainsActive(group) }
+
+    @ViewBuilder private var foldMark: some View {
+        Image(systemName: "chevron.down")
+            .font(.system(size: 9, weight: .semibold))
+            .rotationEffect(.degrees(group.collapsed ? -90 : 0))
+            .animation(Motion.settle, value: group.collapsed)
+    }
+
+    @ViewBuilder private var foldedExtras: some View {
+        if marked {
+            Circle().fill(Color.accentColor).frame(width: 6, height: 6)
+                .help("The tab you are on is in this group")
+        }
+        if hidden > 0 {
+            Text("\(hidden)")
+                .font(.system(size: 10.5, weight: .semibold))
+                .padding(.horizontal, 6).padding(.vertical, 1)
+                .background(Capsule().fill(greys.wash))
+                .help("\(hidden) tab\(hidden == 1 ? "" : "s") folded away")
+        }
     }
 
     var body: some View {
@@ -81,21 +112,27 @@ struct GroupHeading: View {
         HStack(spacing: 2) {
             Text(group.name.first.map { String($0).uppercased() } ?? "•")
                 .font(.system(size: 9.5, weight: .semibold))
+            if group.collapsed, hidden > 0 {
+                Text("\(hidden)").font(.system(size: 8, weight: .semibold))
+            }
             Image(systemName: "chevron.down")
                 .font(.system(size: 6.5, weight: .bold))
                 .rotationEffect(.degrees(group.collapsed ? -90 : 0))
+                .animation(Motion.settle, value: group.collapsed)
         }
         .foregroundStyle(hovering ? Palette.ink.opacity(0.7) : Palette.muted)
         .frame(maxWidth: .infinity)
         .frame(height: Self.compactHeight)
         .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
-            .fill(dropping ? greys.wash : (hovering ? greys.hover : greys.tile)))
+            .fill(dropping ? greys.wash : (hovering ? greys.hover : (group.collapsed ? greys.wash : greys.tile))))
         .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         .onTapGesture { browser.toggleTabGroup(group.id) }
         .modifier(GroupHeadingShared(browser: browser, group: group, dragSpace: dragSpace, dropping: $dropping))
         .onHover { hovering = $0 }
-        .help(group.collapsed ? "\(group.name) — folded" : group.name)
+        .help(group.collapsed ? "\(group.name) — \(hidden) folded away, click to expand" : "\(group.name) — click to fold")
         .accessibilityLabel(group.name)
+        .accessibilityValue(group.collapsed ? "Folded, \(hidden) tabs hidden\(marked ? ", includes the tab you are on" : "")" : "Expanded")
+        .accessibilityHint("Toggles the group open or folded")
         // Rename Group: no room for the name here, so it is typed beside.
         .popover(isPresented: Binding(get: { editing }, set: { if !$0 { browser.editingGroupID = nil } }),
                  arrowEdge: browser.prefs.sidePosition == .right ? .leading : .trailing) {
@@ -115,7 +152,8 @@ struct GroupHeading: View {
     }
 
     private var long: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
+            if !editing { foldMark }
             if editing {
                 TextField("Group name", text: $draft)
                     .textFieldStyle(.plain)
@@ -132,27 +170,26 @@ struct GroupHeading: View {
             }
             if !horizontal { Spacer(minLength: 0) }
             if !editing, group.collapsed {
+                foldedExtras
                 if let number = shortcutNumbers[group.id] {
                     TabShortcutNumber(number: number)
                 } else if horizontal, browser.prefs.showsTabShortcuts {
                     Color.clear.frame(width: 15, height: 15)
                 }
             }
-            if !editing && !horizontal {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .medium))
-                    .rotationEffect(.degrees(group.collapsed ? -90 : 0))
-                    .opacity(hovering ? 1 : 0)
-            }
         }
-        .foregroundStyle(Palette.muted)
+        .foregroundStyle(group.collapsed ? Palette.ink.opacity(0.75) : Palette.muted)
         .padding(.horizontal, 10)
         .frame(height: horizontal ? 28 : Self.height)
         .frame(maxWidth: horizontal ? nil : .infinity, alignment: .leading)
         .fixedSize(horizontal: horizontal, vertical: false)
         .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
-            .fill(dropping ? greys.wash : (hovering ? greys.hover : .clear)))
+            .fill(dropping ? greys.wash : (hovering ? greys.hover : (group.collapsed ? greys.tile : .clear))))
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .help(editing ? group.name : (group.collapsed ? "\(group.name) — \(hidden) folded away, click to expand" : "\(group.name) — click to fold"))
+        .accessibilityLabel(group.name)
+        .accessibilityValue(group.collapsed ? "Folded, \(hidden) tabs hidden\(marked ? ", includes the tab you are on" : "")" : "Expanded")
+        .accessibilityHint("Toggles the group open or folded")
         .onTapGesture { if !editing { browser.toggleTabGroup(group.id) } }
         .modifier(GroupHeadingShared(browser: browser, group: group, dragSpace: dragSpace, dropping: $dropping))
         .onHover { hovering = $0 }
